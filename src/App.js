@@ -1,25 +1,90 @@
-import logo from './logo.svg';
-import './App.css';
+import React, { useState, useEffect } from 'react';
+import { Routes, Route } from 'react-router-dom';
+import axios from 'axios';
+import Layout from './components/Layout';
+import Home from './pages/Home';
+import Play from './pages/Play';
+import Result from './pages/Result';
+import History from './pages/History';
+import QuestionBank from './pages/QuestionBank';
+import QuestionDetail from './pages/QuestionDetail';
+import NotFound from './pages/NotFound';
 
-function App() {
+const STORAGE_KEY = 'ltw_3mang_history';
+
+const App = () => {
+  const [questions, setQuestions] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+  const [playerName, setPlayerName] = useState('');
+  const [history, setHistory] = useState(() => {
+    const saved = localStorage.getItem(STORAGE_KEY);
+    return saved ? JSON.parse(saved) : [];
+  });
+
+  useEffect(() => {
+    const controller = new AbortController();
+    axios
+      .get('/data/questions.json', { signal: controller.signal })
+      .then((res) => {
+        setQuestions(res.data);
+        setLoading(false);
+      })
+      .catch((err) => {
+        if (axios.isCancel(err)) return;
+        setError('Không tải được câu hỏi.');
+        setLoading(false);
+      });
+    return () => controller.abort();
+  }, []);
+
+  useEffect(() => {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(history));
+  }, [history]);
+
+  const addHistory = (record) => setHistory((prev) => [...prev, record]);
+  const clearHistory = () => setHistory([]);
+
   return (
-    <div className="App">
-      <header className="App-header">
-        <img src={logo} className="App-logo" alt="logo" />
-        <p>
-          Edit <code>src/App.js</code> and save to reload.
-        </p>
-        <a
-          className="App-link"
-          href="https://reactjs.org"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          Learn React
-        </a>
-      </header>
-    </div>
+    <Routes>
+      <Route path="/" element={<Layout loading={loading} error={error} />}>
+        <Route
+          index
+          element={
+            <Home
+              playerName={playerName}
+              setPlayerName={setPlayerName}
+              history={history}
+            />
+          }
+        />
+        <Route
+          path="play"
+          element={
+            <Play
+              questions={questions}
+              playerName={playerName}
+              onAddHistory={addHistory}
+            />
+          }
+        />
+        <Route path="result" element={<Result />} />
+        <Route
+          path="history"
+          element={<History history={history} onClearHistory={clearHistory} />}
+        />
+        <Route
+          path="questions"
+          element={<QuestionBank questions={questions} />}
+        />
+        <Route
+          path="questions/:id"
+          element={<QuestionDetail questions={questions} />}
+        />
+        <Route path="*" element={<NotFound />} />
+      </Route>
+    </Routes>
   );
-}
+};
 
 export default App;
